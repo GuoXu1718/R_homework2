@@ -139,4 +139,5 @@ sum(is.na(acc_veh_left$VEH_NO))
 
 ## 3 Push your homework to a git repository
 
-在本地建立git仓库，并push到git远程仓库中。
+在本地建立git仓库，并push到git远程仓库中,github界面截图及链接如下。\
+[GitHub远程仓库仓库链接](https://github.com/GuoXu1718/R_homework2.git) ![](https://github.com/GuoXu1718/R_homework2/raw/main/github%E7%95%8C%E9%9D%A2%E6%88%AA%E5%9B%BE.jpg)
