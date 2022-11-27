@@ -1,0 +1,142 @@
+---
+title: "R作业2"
+author: "2233361郭旭"
+date: "2022-11-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1 Using the iri dateset
+
+### 1.1 Get a subset with STATE_CODE 6 and SHRP_ID starting with 050
+
+筛选出iri数据集中**STATE_CODE**值为**6**且**SHRP_ID**开头为**050**的数据。
+
+```{r,warning=FALSE,message=FALSE}
+library(tidyverse)
+library(data.table)
+
+iri <- fread("data-assignment\\LTPP\\iri.csv")
+iri_6_050 <-
+  iri |>
+  dplyr::filter(STATE_CODE == 6 & stringr::str_detect(SHRP_ID,"^050"))
+iri_6_050
+```
+
+### 1.2 Get the summary statistics of each section: min, max, and mean
+
+对iri数据集中数据进行分组，并统计各组数量，然后分别计算各组**IRI**的**最小值、最大值和平均值**。
+
+```{r,warning=FALSE,message=FALSE}
+iri_m <- iri |>
+  group_by( STATE_CODE, SHRP_ID ) |>
+  summarise(
+    observation = n(),
+    iri_max = max(IRI),
+    iri_min = min(IRI),
+    iri_mean = mean(IRI),.groups = "drop"
+  )
+iri_m
+```
+
+### 1.3 Sort the summarized data by mean IRI in descending order (report results for one section only)
+
+首先根据**IRI平均值**，对数据进行**降序**排序，然后筛选出一组数据进行展示。
+
+```{r,warning=FALSE,message=FALSE}
+iri_m_order <-
+  iri_m |>
+  arrange(-iri_mean) |>
+  dplyr::filter(STATE_CODE == 6 & str_detect(SHRP_ID,"050"))
+iri_m_order
+```
+
+### 1.4 Generate a scatter plot for the averaged IRI against the time for a selected section, and then give your interpretation of the plot
+
+首先筛选出要处理的数据，然后根据对数据进行分组，并求IRI平均值，最后对所选部分的**IRI平均值**和**时间**的关系生成**散点图**。
+
+```{r,warning=FALSE,message=FALSE}
+library(ggthemes)
+
+iri_date_IRI <-
+  fread("data-assignment\\LTPP\\iri.csv") |>
+  dplyr::filter(STATE_CODE == 6 & str_detect(SHRP_ID,"050")) |>
+  group_by(STATE_CODE, SHRP_ID, VISIT_DATE) |>
+  summarise(iri_mean = mean(IRI),.groups = "drop") |>
+  separate(VISIT_DATE, into=c("VISIT_DATE", "time"), sep="\\,") |>
+  mutate(VISIT_DATE = parse_date(VISIT_DATE, "%m/%d/%y")) |>
+  mutate_if(is.numeric, ~round(.x, 3))
+
+p1 <-
+  iri_date_IRI |>
+  ggplot(aes(x=VISIT_DATE, y=iri_mean)) +
+  geom_point(aes(color=SHRP_ID), shape=16, size=2, stroke=1/2, alpha=3/4) +
+  geom_smooth(aes(color=SHRP_ID), method="loess", se=FALSE, linewidth=1/3) +
+  geom_smooth(method="loess", se=TRUE, linewidth=3/2) +
+  scale_color_ptol() +
+  labs(x="DATE", y="Mean IRI (m/km)", title="STATE_CODE: 6")
+p1
+
+p2 <-
+  iri_date_IRI |>
+  ggplot(aes(x=VISIT_DATE, y=iri_mean)) +
+  geom_point(shape=16, size=2, stroke=1/2, alpha=3/4) +
+  geom_smooth(method="loess", se=FALSE, linewidth=1/2) +
+  scale_color_brewer() +
+  facet_wrap(~SHRP_ID, ncol=3) +
+  labs(x="DATE", y="Mean IRI (m/km)", title="STATE_CODE: 6")
+p2
+```
+
+**数据分析：**经过查询相关资料，IRI为国际平整度指数。**整体分析：**根据数据分析所得的散点图，筛选出的相关路段IRI指数整体呈现出先降后升的趋势。早期路面平整度下降，原因可能是新建公路缺乏路面养护或路面养护方法效果不佳；中期路面国际平整度指数基本保持不变，说明养护作业效果较好；后期路面国际平整度指数升高，原因可能是对路面进行了翻修，或者采用了新的更有效的养护技术。**分组分析：**其中，3、4、7、8号路段国际平整度指数均保持在一定范围内，说明养护作业效果良好，并且未采取新的措施或方法；5、6号路段国际平整度指数前中期保持在一定范围内，后期升高值较大，可能采取了新措施或方法；1、2、9号路段，国际平整度指数咸下降到一定水平，后升高，可能道路新建一段时间后才开始养护作业，并在后期采取了新措施或新养护方法。
+
+## 2 Using the CRSS datasets in 2017
+
+### 2.1 Get the intersection of the datasets accident and person
+
+对**ACCIDENT**和**PERSON**数据集进行了**inner_join**操作。
+
+```{r,warning=FALSE,message=FALSE}
+library(data.table)
+
+datasets_intersection <-
+  list("data-assignment/CRSS/ACCIDENT.csv",
+       "data-assignment/CRSS/PERSON.csv") |>
+  map(fread) |>
+  reduce(inner_join) |>
+  distinct()
+```
+
+### 2.2 Tabulate the total number of observations in each injury severity (INJ_SEV)
+
+统计不同每种**损伤严重程度**的**数量**。
+
+```{r}
+inj_sev_obs <-
+  fread("data-assignment/CRSS/PERSON.csv") |>
+  group_by(INJ_SEV) |>
+  summarise(INI_SEV_NUM = n(),.groups = "drop")
+inj_sev_obs
+```
+
+### 2.3 Merge the accident dataset with the vehicle dataset, and report the dimension of your results and number of missing values in one variable of the right dataset
+
+合并**accident**和**vehicle**数据集(**left_join**)，并计算合并后数据集的**维度**和右侧数据集其中一个变量的**缺失值数量**。
+
+```{r,warning=FALSE,message=FALSE}
+acc_veh_left <-
+  list("data-assignment/CRSS/ACCIDENT.csv",
+       "data-assignment/CRSS/VEHICLE.csv") |>
+  map(fread) |>
+  reduce(left_join) |>
+  distinct()
+dim(acc_veh_left)
+sum(is.na(acc_veh_left$VEH_NO))
+```
+
+## 3 Push your homework to a git repository
+
+在本地建立git仓库，并push到git远程仓库中。
